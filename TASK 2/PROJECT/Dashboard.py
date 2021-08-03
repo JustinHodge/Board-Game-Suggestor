@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter.ttk import *
 
-window = tk.Tk()       # creating the window object
+window = tk.Tk()
 window.title('Board Game Suggestor')
 # write your code here
 choice_one_label = Label(window, text='CHOICE #1')
@@ -33,4 +33,4 @@ game_choice_five.grid(row=5,column=2, pady=15, padx=10)
 get_results_button = Button(text='Get My Results')
 get_results_button.grid(row=7, column=1, pady=15, padx=15)
 
-window.mainloop()           # keeping the window until we close it
+window.mainloop()
