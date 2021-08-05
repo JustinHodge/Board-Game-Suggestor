@@ -19,4 +19,4 @@ import DataModel
 
 if __name__ == '__main__':
     new_model = DataModel.DataModel()
-    print(new_model.get_clean_data())
+    print(new_model.predict_game_cluster([1, 5, 792]))
