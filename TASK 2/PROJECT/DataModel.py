@@ -7,9 +7,10 @@ from sklearn.cluster import KMeans
 from sklearn.linear_model import LinearRegression
 import numpy as np
 from collections import OrderedDict
+import math
 
 class DataModel:
-    def __init__(self, path_to_unclean_set = 'TASK 2\PROJECT\games_detailed_info.csv'):
+    def __init__(self, path_to_unclean_set = 'games_detailed_info.csv'):
         self.unclean_set= pd.read_csv(path_to_unclean_set)
         self.language_value = {
             'NO' : 1,
@@ -29,16 +30,28 @@ class DataModel:
         self.cmap = colors.ListedColormap(['r','g','b','c','m', 'y'])
         self.clean_data_set = self.create_clean_data_set(self.unclean_set)
 
+        #create scaler and scale total data set
         self.scaler_model = StandardScaler().fit(self.clean_data_set)
-        self.pca_model = PCA(n_components=2, random_state=self.random_seed).fit(self.get_scaled_data(self.get_clean_data))
-        self.split_data()
+        self.scaled_data_set = self.scaler_model.transform(self.clean_data_set)
+
+        #create pca model and find pca of full set
+        self.pca_model = PCA(n_components=2, random_state=self.random_seed).fit(self.scaled_data_set)
+        self.pca_data_set = self.pca_model.transform(self.clean_data_set)
+
+        self.train_set, self.test_set = train_test_split(self.pca_data_set, test_size=0.2, random_state=self.random_seed, shuffle=True)
+
+        # create kmeans_model and find kmeans of full set
         self.kmeans_model = KMeans(n_clusters=6, random_state=self.random_seed).fit(self.train_set)
-        self.linear_regression_model = LinearRegression().fit(self.train_set, self.get_kmeans_prediction(self.train_set))
+        self.kmeans_data_set = self.kmeans_model.predict(self.train_set)
+
+        #create linear regression model
+        self.linear_regression_model = LinearRegression().fit(self.train_set, self.kmeans_data_set)
 
         self.add_cluster_numbers()
 
+
     def add_cluster_numbers(self):
-        all_games_kmeans = self.kmeans_model.predict(self.get_pca_data(self.clean_data_set))
+        all_games_kmeans = self.kmeans_model.predict(self.pca_data_set)
         self.clean_data_set['cluster'] = all_games_kmeans.tolist()
         self.unclean_set['cluster'] = self.clean_data_set['cluster']
 
@@ -145,12 +158,12 @@ class DataModel:
     def get_pca_data(self, scaled_data):
         return self.pca_model.transform(scaled_data)
 
-    def split_data(self, pca_data_frame=None):
-        if pca_data_frame is None:
-            pca_data_frame = self.get_pca_data(self.pca_model.transform(self.clean_data_set))
-        train_set, test_set = train_test_split(pca_data_frame, test_size=0.2, random_state=self.random_seed, shuffle=True)
-        self.train_set = train_set
-        self.test_set = test_set
+    # def split_data(self, pca_data_frame=None):
+    #     if pca_data_frame is None:
+    #         pca_data_frame = self.get_pca_data(self.get_scaled_data(self.clean_data_set))
+    #     train_set, test_set = train_test_split(pca_data_frame, test_size=0.2, random_state=self.random_seed, shuffle=True)
+    #     self.train_set = train_set
+    #     self.test_set = test_set
     
     def get_test_set(self):
         return self.test_set
@@ -159,7 +172,30 @@ class DataModel:
         return self.train_set
 
     def get_kmeans_prediction(self, pca_data):
-        return self.kmeans_model(pca_data)
+        return self.kmeans_model.predict(pca_data)
     
     def get_regression_prediction(self, kmeans_data):
         return self.linear_regression_model.predict(kmeans_data)
+
+    def predict_game_cluster(self, game_id_list):
+        number_of_features = len(self.clean_data_set.columns) - 1
+        games = np.empty((0,number_of_features), float)
+        for game_id in game_id_list:
+            print(game_id)
+            games = np.append(games, [self.clean_data_set.iloc[game_id].drop('cluster')], axis=0)
+        average_of_games = np.average(games, axis=0)
+        scaled_average = self.scaler_model.transform(average_of_games.reshape(1, -1))
+        pca_average = self.pca_model.transform(scaled_average)
+        kmeans_average = self.get_kmeans_prediction(pca_average)
+        predicted_cluster = self.linear_regression_model.predict(kmeans_average)
+        if predicted_cluster - math.floor(predicted_cluster) <= .5:
+            predicted_cluster = math.floor(predicted_cluster)
+        else:
+            predicted_cluster = math.ceil(predicted_cluster)
+        if predicted_cluster < 0:
+            predicted_cluster = 0
+        elif predicted_cluster > 5:
+            predicted_cluster = 5
+
+        
+        return predicted_cluster
