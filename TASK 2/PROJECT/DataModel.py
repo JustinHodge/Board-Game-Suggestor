@@ -10,7 +10,7 @@ from collections import OrderedDict
 import math
 
 class DataModel:
-    def __init__(self, path_to_unclean_set = 'games_detailed_info.csv'):
+    def __init__(self, path_to_unclean_set = 'TASK 2\PROJECT\games_detailed_info.csv'):
         self.unclean_set= pd.read_csv(path_to_unclean_set)
         self.language_value = {
             'NO' : 1,
@@ -37,7 +37,7 @@ class DataModel:
         #create pca model and find pca of full set
         pca = PCA(n_components=2, random_state=self.random_seed)
         self.pca_model = pca.fit(self.scaled_data_set)
-        pca_data_array = self.pca_model.transform(self.clean_data_set)
+        pca_data_array = self.pca_model.transform(self.scaled_data_set)
         self.pca_data_set = pd.DataFrame(data=pca_data_array, columns = ['PC1', 'PC2'])
 
         self.train_set, self.test_set = train_test_split(self.pca_data_set, test_size=0.2, random_state=self.random_seed, shuffle=True)
@@ -46,11 +46,10 @@ class DataModel:
         kmeans = KMeans(n_clusters=6, random_state=self.random_seed)
         self.kmeans_model = kmeans.fit(self.train_set)
         self.kmeans_data_set = self.kmeans_model.predict(self.train_set)
+        self.kmeans_test_set = self.kmeans_model.predict(self.test_set)
 
         #create linear regression model
         self.linear_regression_model = LinearRegression().fit(self.train_set, self.kmeans_data_set)
-        print(self.linear_regression_model)
-        print(self.linear_regression_model.score(self.train_set, self.kmeans_data_set))
 
         self.add_cluster_numbers()
 
@@ -148,33 +147,12 @@ class DataModel:
         clean_data_set = clean_data_set[clean_data_set['suggested_language_dependence'] > 0]
         return clean_data_set
 
-    def get_clean_data(self):
-        return self.clean_data_set
-
-    def get_pca_model(self):
-        return self.pca_model
-
-    def get_scaler_model(self):
-        return self.scaler_model
-
-    def get_scaled_data(self):
-        return self.scaled_data_set
-    
-    def get_pca_data(self):
-        return self.pca_data_set
-
     # def split_data(self, pca_data_frame=None):
     #     if pca_data_frame is None:
     #         pca_data_frame = self.get_pca_data(self.get_scaled_data(self.clean_data_set))
     #     train_set, test_set = train_test_split(pca_data_frame, test_size=0.2, random_state=self.random_seed, shuffle=True)
     #     self.train_set = train_set
     #     self.test_set = test_set
-    
-    def get_test_set(self):
-        return self.test_set
-    
-    def get_train_set(self):
-        return self.train_set
 
     def predict_game_cluster(self, game_id_list):
         number_of_features = len(self.clean_data_set.columns) - 1
@@ -182,11 +160,8 @@ class DataModel:
         for game_id in game_id_list:
             games = np.append(games, np.array([self.clean_data_set.iloc[game_id].drop('cluster')]), axis=0)
         average_of_games = np.average(games, axis=0)
-        print(average_of_games)
         scaled_average = self.scaler_model.transform(average_of_games.reshape(1, -1))
-        print(scaled_average)
         pca_average = self.pca_model.transform(scaled_average)
-        print(pca_average)
         predicted_cluster = self.linear_regression_model.predict(pca_average)
         if predicted_cluster - math.floor(predicted_cluster) <= .5:
             predicted_cluster = math.floor(predicted_cluster)
@@ -197,5 +172,4 @@ class DataModel:
         elif predicted_cluster > 5:
             predicted_cluster = 5
 
-        
         return predicted_cluster
