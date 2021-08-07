@@ -1,5 +1,6 @@
 import pandas as pd
 from matplotlib import colors
+from pandas.core.frame import DataFrame
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
@@ -10,7 +11,8 @@ from collections import OrderedDict
 import math
 
 class DataModel:
-    def __init__(self, path_to_unclean_set = 'TASK 2\PROJECT\games_detailed_info.csv'):
+    def __init__(self, controller, path_to_unclean_set = 'games_detailed_info.csv'):
+        self.controller = controller
         self.unclean_set= pd.read_csv(path_to_unclean_set)
         self.language_value = {
             'NO' : 1,
@@ -26,9 +28,10 @@ class DataModel:
             'NOTRECOMMENDED' : 1
         }
 
-        self.random_seed = 222
+        self.random_seed = 87
         self.cmap = colors.ListedColormap(['r','g','b','c','m', 'y'])
         self.clean_data_set = self.create_clean_data_set(self.unclean_set)
+
 
         #create scaler and scale total data set
         self.scaler_model = StandardScaler().fit(self.clean_data_set)
@@ -43,15 +46,17 @@ class DataModel:
         self.train_set, self.test_set = train_test_split(self.pca_data_set, test_size=0.2, random_state=self.random_seed, shuffle=True)
 
         # create kmeans_model and find kmeans of full set
-        kmeans = KMeans(n_clusters=6, random_state=self.random_seed)
-        self.kmeans_model = kmeans.fit(self.train_set)
+        self.kmeans_model = KMeans(n_clusters=6, random_state=self.random_seed)
+        self.kmeans_model.fit(self.train_set)
         self.kmeans_data_set = self.kmeans_model.predict(self.train_set)
         self.kmeans_test_set = self.kmeans_model.predict(self.test_set)
 
         #create linear regression model
         self.linear_regression_model = LinearRegression().fit(self.train_set, self.kmeans_data_set)
+        print(self.linear_regression_model.coef_)
 
         self.add_cluster_numbers()
+        self.name_index_set = pd.DataFrame(self.unclean_set['primary'], self.clean_data_set.index.values, columns=['index', 'name'])
 
 
     def add_cluster_numbers(self):
@@ -147,13 +152,6 @@ class DataModel:
         clean_data_set = clean_data_set[clean_data_set['suggested_language_dependence'] > 0]
         return clean_data_set
 
-    # def split_data(self, pca_data_frame=None):
-    #     if pca_data_frame is None:
-    #         pca_data_frame = self.get_pca_data(self.get_scaled_data(self.clean_data_set))
-    #     train_set, test_set = train_test_split(pca_data_frame, test_size=0.2, random_state=self.random_seed, shuffle=True)
-    #     self.train_set = train_set
-    #     self.test_set = test_set
-
     def predict_game_cluster(self, game_id_list):
         number_of_features = len(self.clean_data_set.columns) - 1
         games = np.empty((0,number_of_features), float)
@@ -173,3 +171,13 @@ class DataModel:
             predicted_cluster = 5
 
         return predicted_cluster
+
+    def choose_result(self, predicted_cluster):
+        if predicted_cluster >=0 and predicted_cluster <=5:
+            return self.unclean_set[self.unclean_set['cluster'] == predicted_cluster].sample(n=1)
+    
+    def get_names_and_ids(self):
+        name_index_set = {}
+        for k,v in zip(self.unclean_set['primary'], self.clean_data_set.index.values):
+            name_index_set[k] = v
+        return name_index_set
